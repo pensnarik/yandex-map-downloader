@@ -1,10 +1,20 @@
 import os
+import time
+import random
 import shutil
 import logging
 import requests
 
+from enum import Enum
 
 logger = logging.getLogger('ymaps')
+
+
+class DownloadResult():
+    DOWNLOADED = 1
+    ERROR = 2
+    EXISTS = 3
+
 
 class Downloader():
 
@@ -12,7 +22,7 @@ class Downloader():
         raise NotImplementedError
 
 
-class DownloadScheduler():
+class DownloadSimpleScheduler():
 
     def __init__(self, objects: list, downloader: Downloader):
         self.objects = objects
@@ -23,6 +33,37 @@ class DownloadScheduler():
             if not os.path.exists(obj.destination()):
                 logger.info(f"Downloading {obj}")
                 self.downloader.download(obj.url(), obj.destination())
+            else:
+                logger.info(f"Object {obj} exists, skipping")
+
+
+class DownloadSleepScheduler():
+
+    def __init__(self, objects: list, downloader: Downloader):
+        self.objects = objects
+        self.downloader = downloader
+
+    def get_next_chunk(self):
+        return random.randint(50, 100), random.randint(5, 10)
+
+    def download(self):
+        logger.info(f"Started to download {len(self.objects)} objects")
+
+        chunk_size, time_to_sleep = self.get_next_chunk()
+        tiles_in_chunk = 0
+
+        for obj in self.objects:
+
+            if not os.path.exists(obj.destination()):
+                logger.info(f"Downloading {obj}")
+                res = self.downloader.download(obj.url(), obj.destination())
+                if res == DownloadResult.DOWNLOADED:
+                    tiles_in_chunk += 1
+                    if tiles_in_chunk > chunk_size:
+                        chunk_size, time_to_sleep = self.get_next_chunk()
+                        logger.info(f"Sleeping for {time_to_sleep} seconds, next chunk size is {chunk_size}")
+                        time.sleep(time_to_sleep)
+                        tiles_in_chunk = 0
             else:
                 logger.info(f"Object {obj} exists, skipping")
 
@@ -51,7 +92,7 @@ class RequestsDownloader(Downloader):
             os.makedirs(os.path.dirname(destination))
 
         if os.path.exists(destination):
-            return True
+            return DownloadResult.EXISTS
 
         req = requests.Request('GET', url, headers=self.headers)
         s = requests.Session()
@@ -60,11 +101,11 @@ class RequestsDownloader(Downloader):
         try:
             response = s.send(r, stream=True)
         except requests.exceptions.ConnectionError as e:
-            return False
+            return DownloadResult.ERROR
         if response.status_code == 200:
             with open(destination, "wb") as f:
                 response.raw.decode_content = True
                 shutil.copyfileobj(response.raw, f)
-            return True
+            return DownloadResult.DOWNLOADED
         else:
-            return False
+            return DownloadResult.ERROR

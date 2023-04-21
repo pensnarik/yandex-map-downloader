@@ -1,2 +1,4 @@
 *.pyc
 maps/*
+moscow-tiles/*
+.venv
