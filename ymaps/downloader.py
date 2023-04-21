@@ -72,25 +72,42 @@ class YMapDownloader(object):
     def GetRandomMirror(self):
         return self.mirrors[random.randint(0,len(self.mirrors)-1)]
 
+    def GetTileHost(self, layer):
+        if layer == 'vec':
+            return 'core-renderer-tiles.maps.yandex.net'
+        elif layer == 'sat':
+            return 'core-sat.maps.yandex.net'
+        else:
+            raise NotImplementedError(f"Unknow layer {layer}")
+
+    def GetTileURL(self, layer, x, y, z, version, lang):
+        if layer == 'vec':
+            return f"/tiles?l=map&v={version}&x={x}&y={y}&z={z}&lang={lang}"
+        elif layer == 'sat':
+            return f"/tiles?l=sat&v={version}&x={x}&y={y}&z={z}&scale=1&lang={lang}"
+        else:
+            raise NotImplementedError(f"Unknow layer {layer}")
+
     def DownloadTile(self, x, y, z):
-        layer_mapping = {'vec': 'map', 'sat': 'sat'}
         image_type_mapping = {'vec': 'png', 'sat': 'jpg'}
 
-        filename = "./{path}/{x}_{y}_{z}.{ext}".format(path = self.dir_tiles, x = x, y = y, z = z,
-                                                       ext = image_type_mapping[self.layer])
+        filename = f"./{self.dir_tiles}/{x}_{y}_{z}.{image_type_mapping[self.layer]}"
+
         if os.path.isfile(filename):
             return "e"
-        url = "/tiles?l={layer}&v={version}&x={x}&y={y}&z={scale}&lang={lang}".format(layer = layer_mapping[self.layer],
-            version = self.version, x = x, y = y, scale = z, lang = self.language)
+
+        url = self.GetTileURL(self.layer, x, y, z, self.version, self.language)
+
         headers = {"User-Agent": self.user_agent,
                    "Accept": self.accept,
                    "Accept-Language": self.accept_language,
                    "Accept-Encoding": self.accept_encoding,
                    "Accept-Charset": self.accept_charset,
                    "Referer": self.referer}
-        req = requests.Request('GET', "http://%s%s" % (self.GetRandomMirror(), url), headers=headers)
+        req = requests.Request('GET', "https://%s%s" % (self.GetTileHost(self.layer), url), headers=headers)
         s = requests.Session()
         r = req.prepare()
+
         try:
             response = s.send(r, stream=True)
         except requests.exceptions.ConnectionError as e:
