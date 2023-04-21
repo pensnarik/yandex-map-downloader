@@ -55,6 +55,8 @@ class Map():
         self.downloader = RequestsDownloader()
         self.version = version
         self.layer = layer
+        self.width = self.x2 - self.x1
+        self.height = self.y2 - self.y1
 
         logger.info(f"Map.__init__(): {self.x1=}, {self.y1=}, {self.x2=}, {self.y2=}")
 

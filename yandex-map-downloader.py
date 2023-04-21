@@ -7,6 +7,7 @@ import logging
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
 from ymaps.downloaders import DownloadSleepScheduler
+from ymaps.render import PreviewRenderer
 
 VERSION = '3.1064.0'
 
@@ -23,9 +24,12 @@ Borders = Borders(
 	Coordinate(data['coord2']['lat'], data['coord2']['lon'])
 )
 
-map = Map(Borders, z=14, layer='sat', version=VERSION)
+map = Map(Borders, z=20, layer='sat', version=VERSION)
 
 logger.info(f"{len(map)=}")
 
-map.download_scheduler = DownloadSleepScheduler
-map.download()
+# map.download_scheduler = DownloadSleepScheduler
+# map.download()
+
+renderer = PreviewRenderer(map)
+renderer.render('overview.png')

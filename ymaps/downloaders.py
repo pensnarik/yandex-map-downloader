@@ -44,7 +44,9 @@ class DownloadSleepScheduler():
         self.downloader = downloader
 
     def get_next_chunk(self):
-        return random.randint(50, 100), random.randint(5, 10)
+        size, time_to_sleep = random.randint(50, 100), random.randint(5, 10)
+        logger.info(f"Chunk size = {size}, time_to_sleep = {time_to_sleep}")
+        return size, time_to_sleep
 
     def download(self):
         logger.info(f"Started to download {len(self.objects)} objects")
@@ -61,7 +63,6 @@ class DownloadSleepScheduler():
                     tiles_in_chunk += 1
                     if tiles_in_chunk > chunk_size:
                         chunk_size, time_to_sleep = self.get_next_chunk()
-                        logger.info(f"Sleeping for {time_to_sleep} seconds, next chunk size is {chunk_size}")
                         time.sleep(time_to_sleep)
                         tiles_in_chunk = 0
             else:
@@ -75,7 +76,6 @@ class RequestsDownloader(Downloader):
             'Authority': 'core-sat.maps.yandex.net',
             'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
             'Accept-language': 'en-US,en;q=0.9',
-            'If-none-match': '"1029"',
             'Referer': 'https://yandex.ru/maps/213/moscow/hybrid/?ll=37.618045%2C55.753260&z=20',
             'Sec-ch-ua': '"Not:A-Brand";v="99", "Chromium";v="112"',
             'Sec-ch-ua-mobile': '?0',
@@ -83,6 +83,7 @@ class RequestsDownloader(Downloader):
             'Sec-fetch-dest': 'image',
             'Sec-fetch-mode': 'no-cors',
             'Sec-fetch-site': 'cross-site',
+            'Cache-Control': 'no-cache',
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
         }
 
@@ -93,6 +94,10 @@ class RequestsDownloader(Downloader):
 
         if os.path.exists(destination):
             return DownloadResult.EXISTS
+
+        # Do not retry
+        if os.path.exists(f"{destination}.error"):
+            return DownloadResult.ERROR
 
         req = requests.Request('GET', url, headers=self.headers)
         s = requests.Session()
@@ -108,4 +113,9 @@ class RequestsDownloader(Downloader):
                 shutil.copyfileobj(response.raw, f)
             return DownloadResult.DOWNLOADED
         else:
+            logger.error(f"Downloader, {response.status_code=}, URL was: {url}")
+
+            with open(f"{destination}.error", "wt") as f:
+                f.write(str(response.status_code))
+
             return DownloadResult.ERROR
