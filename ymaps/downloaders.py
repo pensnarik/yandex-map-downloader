@@ -6,6 +6,7 @@ import logging
 import requests
 
 from enum import Enum
+from urllib3.exceptions import ProtocolError
 
 logger = logging.getLogger('ymaps')
 
@@ -44,7 +45,7 @@ class DownloadSleepScheduler():
         self.downloader = downloader
 
     def get_next_chunk(self):
-        size, time_to_sleep = random.randint(50, 100), random.randint(5, 10)
+        size, time_to_sleep = random.randint(100, 200), random.randint(5, 10)
         logger.info(f"Chunk size = {size}, time_to_sleep = {time_to_sleep}")
         return size, time_to_sleep
 
@@ -107,10 +108,16 @@ class RequestsDownloader(Downloader):
             response = s.send(r, stream=True)
         except requests.exceptions.ConnectionError as e:
             return DownloadResult.ERROR
+
         if response.status_code == 200:
             with open(destination, "wb") as f:
                 response.raw.decode_content = True
-                shutil.copyfileobj(response.raw, f)
+                try:
+                    shutil.copyfileobj(response.raw, f)
+                except ProtocolError as e:
+                    logger.error(f"Could not download {url}: {e}")
+                    return DownloadResult.ERROR
+
             return DownloadResult.DOWNLOADED
         else:
             logger.error(f"Downloader, {response.status_code=}, URL was: {url}")
