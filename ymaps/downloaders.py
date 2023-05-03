@@ -4,9 +4,11 @@ import random
 import shutil
 import logging
 import requests
+import signal
 
 from enum import Enum
 from urllib3.exceptions import ProtocolError
+from ymaps.timeout import TimeoutError
 
 logger = logging.getLogger('ymaps')
 
@@ -90,6 +92,9 @@ class RequestsDownloader(Downloader):
 
 
     def download(self, url, destination):
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
         if not os.path.isdir(os.path.dirname(destination)):
             os.makedirs(os.path.dirname(destination))
 
@@ -104,25 +109,41 @@ class RequestsDownloader(Downloader):
         s = requests.Session()
         r = req.prepare()
 
+        error_code = None
+        old = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(5)
+
         try:
             response = s.send(r, stream=True)
+
+            if response.status_code == 200:
+                with open(destination, "wb") as f:
+                    response.raw.decode_content = True
+                    try:
+                        shutil.copyfileobj(response.raw, f)
+                    except ProtocolError as e:
+                        logger.error(f"Could not download {url}: {e}")
+                        return DownloadResult.ERROR
+            else:
+                error_code = str(response.status_code)
+
         except requests.exceptions.ConnectionError as e:
             return DownloadResult.ERROR
+        except TimeoutError:
+            error_code = 'timeout'
+        finally:
+            # reinstall the old signal handler
+            signal.signal(signal.SIGALRM, old)
+            # cancel the alarm
+            # this line should be inside the "finally" block (per Sam Kortchmar)
+            signal.alarm(0)
 
-        if response.status_code == 200:
-            with open(destination, "wb") as f:
-                response.raw.decode_content = True
-                try:
-                    shutil.copyfileobj(response.raw, f)
-                except ProtocolError as e:
-                    logger.error(f"Could not download {url}: {e}")
-                    return DownloadResult.ERROR
-
+        if error_code is None:
             return DownloadResult.DOWNLOADED
         else:
-            logger.error(f"Downloader, {response.status_code=}, URL was: {url}")
+            logger.error(f"Downloader, {error_code=}, URL was: {url}")
 
             with open(f"{destination}.error", "wt") as f:
-                f.write(str(response.status_code))
+                f.write(error_code)
 
             return DownloadResult.ERROR
