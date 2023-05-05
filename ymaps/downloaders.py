@@ -174,4 +174,4 @@ class RequestsDownloader(Downloader):
             # this line should be inside the "finally" block (per Sam Kortchmar)
             signal.alarm(0)
 
-        return DownloadResult.DOWNLOADED
+        return DownloadResult(DownloadResultEnum.DOWNLOADED)

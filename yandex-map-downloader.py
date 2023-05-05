@@ -28,6 +28,7 @@ class App():
         parser.add_argument('--download', help='Download map', action='store_true', default=False)
         parser.add_argument('--preview', help='Preview map', action='store_true', default=False)
         parser.add_argument('--tile', help='Tile', type=str, required=False)
+        parser.add_argument('--scale', help='Scale', type=int, required=False)
         self.args = parser.parse_args()
 
 
@@ -57,7 +58,7 @@ class App():
             Coordinate(data['coord2']['lat'], data['coord2']['lon'])
         )
 
-        return Map(borders, z=20, layer='sat', version=VERSION)
+        return Map(borders, z=self.args.scale, layer='sat', version=VERSION)
 
         logger.info(f"{len(self.map)=}")
 
