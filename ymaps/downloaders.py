@@ -12,14 +12,46 @@ from ymaps.timeout import TimeoutError
 
 logger = logging.getLogger('ymaps')
 
-RETRY_ERRORS = ['400', 'timeout']
 
-class DownloadResult():
+class DownloadResultEnum(Enum):
     DOWNLOADED = 1
     ERROR = 2
     EXISTS = 3
 
+class DownloadResult():
 
+    def __init__(self, result: DownloadResultEnum, code: str=None):
+        self.__result = result
+        self.__code = code
+
+    def is_retriable(self):
+        return self.__result == DownloadResultEnum.ERROR and \
+               self.__code in ['400', 'timeout', 'connection_error']
+
+    def need_to_sleep(self):
+        return self.__result == DownloadResultEnum.DOWNLOADED
+
+    def is_success(self):
+        return self.__result == DownloadResultEnum.DOWNLOADED
+
+    @classmethod
+    def fromstr(cls, s: str):
+        if ',' not in s:
+            return cls(DownloadResultEnum[s])
+        else:
+            return cls(DownloadResultEnum[s.split(',')[0]], s.split(',')[1])
+
+    def __str__(self):
+        if self.__code:
+            return f"{self.__result.name},{self.__code}"
+        else:
+            return f"{self.__result.name}"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+# Downloader interface
 class Downloader():
 
     def download(self):
@@ -55,20 +87,33 @@ class DownloadSleepScheduler():
     def download(self):
         logger.warning(f"Started to download {len(self.objects)} objects")
 
+        if len(self.objects) == 0:
+            return
+
         chunk_size, time_to_sleep = self.get_next_chunk()
         tiles_in_chunk = 0
 
+        # FIXME: Currently we assume that all objects are in the same path!
+        if not os.path.isdir(os.path.dirname(self.objects[0].destination())):
+            os.makedirs(os.path.dirname(self.objects[0].destination()))
+
         for obj in self.objects:
 
-            if not os.path.exists(obj.destination()):
+            destination = obj.destination()
+
+            if not os.path.exists(destination):
                 logger.info(f"Downloading {obj}")
-                res = self.downloader.download(obj.url(), obj.destination())
-                if res == DownloadResult.DOWNLOADED:
+                res = self.downloader.download(obj.url(), destination)
+                logger.info(f"Download result: {res}")
+                if res.is_success():
                     tiles_in_chunk += 1
                     if tiles_in_chunk > chunk_size:
                         chunk_size, time_to_sleep = self.get_next_chunk()
                         time.sleep(time_to_sleep)
                         tiles_in_chunk = 0
+                else:
+                    with open(f"{destination}.error", "w") as f:
+                        f.write(str(res))
             else:
                 logger.info(f"Object {obj} exists, skipping")
 
@@ -96,23 +141,6 @@ class RequestsDownloader(Downloader):
         def timeout_handler(signum, frame):
             raise TimeoutError
 
-        if not os.path.isdir(os.path.dirname(destination)):
-            os.makedirs(os.path.dirname(destination))
-
-        if os.path.exists(f"{destination}.error"):
-            exist_error_code = open(f"{destination}.error", "r").read()
-            if exist_error_code not in RETRY_ERRORS:
-                return DownloadResult.ERROR
-            else:
-                if os.path.exists(destination):
-                    os.remove(destination)
-
-                os.remove(f"{destination}.error")
-                logger.warning(f"Will retry, previous error was: {exist_error_code}")
-
-        if os.path.exists(destination):
-            return DownloadResult.EXISTS
-
         req = requests.Request('GET', url, headers=self.headers)
         s = requests.Session()
         r = req.prepare()
@@ -131,14 +159,14 @@ class RequestsDownloader(Downloader):
                         shutil.copyfileobj(response.raw, f)
                     except ProtocolError as e:
                         logger.error(f"Could not download {url}: {e}")
-                        return DownloadResult.ERROR
+                        return DownloadResult(DownloadResultEnum.ERROR, 'protocol_error')
             else:
-                error_code = str(response.status_code)
+                return DownloadResult(DownloadResultEnum.ERROR, str(response.status_code))
 
         except requests.exceptions.ConnectionError as e:
-            return DownloadResult.ERROR
+            return DownloadResult(DownloadResultEnum.ERROR, 'connection_error')
         except TimeoutError:
-            error_code = 'timeout'
+            return DownloadResult(DownloadResultEnum.ERROR, 'timeout')
         finally:
             # reinstall the old signal handler
             signal.signal(signal.SIGALRM, old)
@@ -146,13 +174,4 @@ class RequestsDownloader(Downloader):
             # this line should be inside the "finally" block (per Sam Kortchmar)
             signal.alarm(0)
 
-        if error_code is None:
-            return DownloadResult.DOWNLOADED
-        else:
-            if error_code != '404':
-                logger.error(f"Downloader, {error_code=}, URL was: {url}")
-
-            with open(f"{destination}.error", "wt") as f:
-                f.write(error_code)
-
-            return DownloadResult.ERROR
+        return DownloadResult.DOWNLOADED
