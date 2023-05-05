@@ -7,7 +7,7 @@ import argparse
 
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
-from ymaps.downloaders import DownloadSleepScheduler
+from ymaps.downloaders import DownloadSleepScheduler, DownloadSimpleScheduler, RequestsDownloader
 from ymaps.render import PreviewRenderer
 
 VERSION = '3.1064.0'
@@ -24,14 +24,22 @@ class App():
 
     def __parse_args(self):
         parser = argparse.ArgumentParser(description='Schaeffler store parser')
-        parser.add_argument('--map', help='Map filename', type=str, required=True)
+        parser.add_argument('--map', help='Map filename', type=str, required=False)
         parser.add_argument('--download', help='Download map', action='store_true', default=False)
         parser.add_argument('--preview', help='Preview map', action='store_true', default=False)
+        parser.add_argument('--tile', help='Tile', type=str, required=False)
         self.args = parser.parse_args()
 
 
     def __init__(self):
         self.__parse_args()
+
+
+    def download_one_tile(self, tile_str: str):
+        tile = Tile.fromstr(tile_str)
+        downloader = RequestsDownloader()
+        scheduler = DownloadSleepScheduler([tile], downloader)
+        scheduler.download()
 
 
     def download(self, filename):
@@ -64,7 +72,10 @@ class App():
 
     def run(self):
         if self.args.download:
-            self.download(self.args.map)
+            if self.args.tile:
+                self.download_one_tile(self.args.tile)
+            else:
+                self.download(self.args.map)
         if self.args.preview:
             self.preview(self.args.map)
 

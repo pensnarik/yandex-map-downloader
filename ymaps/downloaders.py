@@ -12,6 +12,7 @@ from ymaps.timeout import TimeoutError
 
 logger = logging.getLogger('ymaps')
 
+RETRY_ERRORS = ['400', 'timeout']
 
 class DownloadResult():
     DOWNLOADED = 1
@@ -52,7 +53,7 @@ class DownloadSleepScheduler():
         return size, time_to_sleep
 
     def download(self):
-        logger.info(f"Started to download {len(self.objects)} objects")
+        logger.warning(f"Started to download {len(self.objects)} objects")
 
         chunk_size, time_to_sleep = self.get_next_chunk()
         tiles_in_chunk = 0
@@ -98,12 +99,19 @@ class RequestsDownloader(Downloader):
         if not os.path.isdir(os.path.dirname(destination)):
             os.makedirs(os.path.dirname(destination))
 
+        if os.path.exists(f"{destination}.error"):
+            exist_error_code = open(f"{destination}.error", "r").read()
+            if exist_error_code not in RETRY_ERRORS:
+                return DownloadResult.ERROR
+            else:
+                if os.path.exists(destination):
+                    os.remove(destination)
+
+                os.remove(f"{destination}.error")
+                logger.warning(f"Will retry, previous error was: {exist_error_code}")
+
         if os.path.exists(destination):
             return DownloadResult.EXISTS
-
-        # Do not retry
-        if os.path.exists(f"{destination}.error"):
-            return DownloadResult.ERROR
 
         req = requests.Request('GET', url, headers=self.headers)
         s = requests.Session()
@@ -111,7 +119,7 @@ class RequestsDownloader(Downloader):
 
         error_code = None
         old = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(5)
+        signal.alarm(15)
 
         try:
             response = s.send(r, stream=True)
@@ -141,7 +149,8 @@ class RequestsDownloader(Downloader):
         if error_code is None:
             return DownloadResult.DOWNLOADED
         else:
-            logger.error(f"Downloader, {error_code=}, URL was: {url}")
+            if error_code != '404':
+                logger.error(f"Downloader, {error_code=}, URL was: {url}")
 
             with open(f"{destination}.error", "wt") as f:
                 f.write(error_code)

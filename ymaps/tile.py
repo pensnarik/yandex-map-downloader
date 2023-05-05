@@ -23,12 +23,17 @@ class DownloadableInterface():
 
 class Tile(DownloadableInterface):
 
-    def __init__(self, x: int, y: int, z: int, layer: str, version: str):
+    def __init__(self, x: int, y: int, z: int, layer: str, version: str='3.1064.0'):
         self.x = x
         self.y = y
         self.z = z
         self.layer = layer
         self.version = version
+
+    @classmethod
+    def fromstr(cls, s: str):
+        x, y, z, layer = s.split(',')
+        return cls(x, y, z, layer)
 
     def url(self):
         if self.layer == 'sat':
