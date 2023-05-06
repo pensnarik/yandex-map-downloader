@@ -54,7 +54,6 @@ class Map():
         self.z = z
         self.x1, self.y1 = coordinate_to_tiles(borders.coord1, z)
         self.x2, self.y2 = coordinate_to_tiles(borders.coord2, z)
-        self.downloader = RequestsDownloader()
         self.version = version
         self.layer = layer
         self.width = self.x2 - self.x1
@@ -68,15 +67,6 @@ class Map():
 
     def __len__(self):
         return len(self.tiles)
-
-    def download(self):
-        # Create destination path if not exists
-        if not os.path.exists(self.path()):
-            os.makedirs(self.path())
-
-        d = self.download_scheduler(self.tiles, self.downloader)
-        d.download()
-        del d
 
     def path(self):
         return os.path.join('.', 'maps', self.name, str(self.z))

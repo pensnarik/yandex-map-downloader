@@ -1,6 +1,7 @@
+import random
 import logging
 
-from ymaps import DownloaderInterface
+from ymaps import DownloaderInterface, DownloadPolicyInterface
 
 
 logger = logging.getLogger('ymaps')
@@ -23,9 +24,10 @@ class DownloadSimpleScheduler():
 
 class DownloadSleepScheduler():
 
-    def __init__(self, objects: list, downloader: DownloaderInterface):
+    def __init__(self, objects: list, downloader: DownloaderInterface, policy: DownloadPolicyInterface):
         self.objects = objects
         self.downloader = downloader
+        self.policy = policy
 
     def get_next_chunk(self):
         size, time_to_sleep = random.randint(100, 200), random.randint(5, 10)
@@ -47,10 +49,11 @@ class DownloadSleepScheduler():
             destination = obj.destination()
 
             logger.info(f"Downloading {obj}")
-            policy = CommonDownloadPolicy(obj)
-            if policy.before_download():
-                result = self.downloader.download(obj.url(), destination)
+            download_policy = self.policy(obj)
+
+            if download_policy.before_download():
+                result = self.downloader().download(obj.url(), destination)
                 logger.info(f"Download result: {result}")
-                policy.after_download(result)
+                download_policy.after_download(result)
             else:
                 logger.info(f"Skipping {obj} because of the policy")

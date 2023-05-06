@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import json
 import logging
 import argparse
 
+from ymaps.download_policy import CommonDownloadPolicy
 from ymaps.download_scheduler import DownloadSleepScheduler
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
@@ -40,15 +42,23 @@ class App():
     def download_one_tile(self, tile_str: str):
         tile = Tile.fromstr(tile_map=None, s=tile_str)
         downloader = RequestsDownloader()
-        scheduler = DownloadSleepScheduler([tile], downloader)
+        scheduler = DownloadSleepScheduler([tile], downloader, CommonDownloadPolicy)
         scheduler.download()
 
 
     def download(self, filename):
         self.map = self.prepare_map(filename)
 
-        self.map.download_scheduler = DownloadSleepScheduler
-        self.map.download()
+        self.map.download_scheduler = DownloadSleepScheduler(
+            self.map.tiles,
+            RequestsDownloader,
+            CommonDownloadPolicy
+        )
+
+        if not os.path.exists(self.map.path()):
+            os.makedirs(self.map.path())
+
+        self.map.download_scheduler.download()
 
 
     def prepare_map(self, filename):
