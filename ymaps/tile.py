@@ -2,6 +2,7 @@ import os
 import logging
 
 from enum import Enum
+from ymaps.downloaders import DownloadableInterface
 
 logger = logging.getLogger('ymaps')
 
@@ -12,28 +13,20 @@ class TileStatus(Enum):
     ERROR = 4
 
 
-class DownloadableInterface():
-
-    def url(self):
-        raise NotImplementedError
-
-    def destination():
-        raise NotImplementedError
-
-
 class Tile(DownloadableInterface):
 
-    def __init__(self, x: int, y: int, z: int, layer: str, version: str='3.1064.0'):
+    def __init__(self, tile_map, x: int, y: int, z: int, layer: str, version: str='3.1064.0'):
         self.x = x
         self.y = y
         self.z = z
         self.layer = layer
         self.version = version
+        self.tile_map = tile_map
 
     @classmethod
-    def fromstr(cls, s: str):
+    def fromstr(cls, tile_map, s: str):
         x, y, z, layer = s.split(',')
-        return cls(x, y, z, layer)
+        return cls(tile_map, x, y, z, layer)
 
     def url(self):
         if self.layer == 'sat':
@@ -43,7 +36,12 @@ class Tile(DownloadableInterface):
             raise NotImplementedError(f"Unknown layer: {self.layer}")
 
     def destination(self):
-        return os.path.join('moscow-tiles', str(self.z), f'{self.x}-{self.y}.jpg')
+        if self.tile_map:
+            path = self.tile_map.path()
+        else:
+            path = '.'
+
+        return os.path.join(path, f'{self.x}-{self.y}.jpg')
 
     def status(self):
         if os.path.exists(self.destination()):
@@ -52,7 +50,7 @@ class Tile(DownloadableInterface):
         if os.path.exists(f'{self.destination()}.error'):
             with open(f'{self.destination()}.error') as f:
                 code = f.read()
-            if code == '404':
+            if code == 'ERROR,404':
                 return TileStatus.NOT_FOUND
             else:
                 return TileStatus.ERROR

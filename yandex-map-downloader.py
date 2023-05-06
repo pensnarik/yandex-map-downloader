@@ -5,9 +5,10 @@ import json
 import logging
 import argparse
 
+from ymaps.download_scheduler import DownloadSleepScheduler
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
-from ymaps.downloaders import DownloadSleepScheduler, DownloadSimpleScheduler, RequestsDownloader
+from ymaps.downloaders import RequestsDownloader
 from ymaps.render import PreviewRenderer
 
 VERSION = '3.1064.0'
@@ -37,7 +38,7 @@ class App():
 
 
     def download_one_tile(self, tile_str: str):
-        tile = Tile.fromstr(tile_str)
+        tile = Tile.fromstr(tile_map=None, s=tile_str)
         downloader = RequestsDownloader()
         scheduler = DownloadSleepScheduler([tile], downloader)
         scheduler.download()
@@ -58,7 +59,7 @@ class App():
             Coordinate(data['coord2']['lat'], data['coord2']['lon'])
         )
 
-        return Map(borders, z=self.args.scale, layer='sat', version=VERSION)
+        return Map(data['name'], borders, z=self.args.scale, layer='sat', version=VERSION)
 
         logger.info(f"{len(self.map)=}")
 

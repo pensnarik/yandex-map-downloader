@@ -6,119 +6,16 @@ import logging
 import requests
 import signal
 
-from enum import Enum
 from urllib3.exceptions import ProtocolError
+from ymaps import (DownloadableInterface, DownloaderInterface, DownloadResultEnum,
+                   DownloadPolicyInterface, DownloadResult)
 from ymaps.timeout import TimeoutError
+from ymaps.download_policy import CommonDownloadPolicy
 
 logger = logging.getLogger('ymaps')
 
 
-class DownloadResultEnum(Enum):
-    DOWNLOADED = 1
-    ERROR = 2
-    EXISTS = 3
-
-class DownloadResult():
-
-    def __init__(self, result: DownloadResultEnum, code: str=None):
-        self.__result = result
-        self.__code = code
-
-    def is_retriable(self):
-        return self.__result == DownloadResultEnum.ERROR and \
-               self.__code in ['400', 'timeout', 'connection_error']
-
-    def need_to_sleep(self):
-        return self.__result == DownloadResultEnum.DOWNLOADED
-
-    def is_success(self):
-        return self.__result == DownloadResultEnum.DOWNLOADED
-
-    @classmethod
-    def fromstr(cls, s: str):
-        if ',' not in s:
-            return cls(DownloadResultEnum[s])
-        else:
-            return cls(DownloadResultEnum[s.split(',')[0]], s.split(',')[1])
-
-    def __str__(self):
-        if self.__code:
-            return f"{self.__result.name},{self.__code}"
-        else:
-            return f"{self.__result.name}"
-
-    def __repr__(self):
-        return self.__str__()
-
-
-# Downloader interface
-class Downloader():
-
-    def download(self):
-        raise NotImplementedError
-
-
-class DownloadSimpleScheduler():
-
-    def __init__(self, objects: list, downloader: Downloader):
-        self.objects = objects
-        self.downloader = downloader
-
-    def download(self):
-        for obj in self.objects:
-            if not os.path.exists(obj.destination()):
-                logger.info(f"Downloading {obj}")
-                self.downloader.download(obj.url(), obj.destination())
-            else:
-                logger.info(f"Object {obj} exists, skipping")
-
-
-class DownloadSleepScheduler():
-
-    def __init__(self, objects: list, downloader: Downloader):
-        self.objects = objects
-        self.downloader = downloader
-
-    def get_next_chunk(self):
-        size, time_to_sleep = random.randint(100, 200), random.randint(5, 10)
-        logger.info(f"Chunk size = {size}, time_to_sleep = {time_to_sleep}")
-        return size, time_to_sleep
-
-    def download(self):
-        logger.warning(f"Started to download {len(self.objects)} objects")
-
-        if len(self.objects) == 0:
-            return
-
-        chunk_size, time_to_sleep = self.get_next_chunk()
-        tiles_in_chunk = 0
-
-        # FIXME: Currently we assume that all objects are in the same path!
-        if not os.path.isdir(os.path.dirname(self.objects[0].destination())):
-            os.makedirs(os.path.dirname(self.objects[0].destination()))
-
-        for obj in self.objects:
-
-            destination = obj.destination()
-
-            if not os.path.exists(destination):
-                logger.info(f"Downloading {obj}")
-                res = self.downloader.download(obj.url(), destination)
-                logger.info(f"Download result: {res}")
-                if res.is_success():
-                    tiles_in_chunk += 1
-                    if tiles_in_chunk > chunk_size:
-                        chunk_size, time_to_sleep = self.get_next_chunk()
-                        time.sleep(time_to_sleep)
-                        tiles_in_chunk = 0
-                else:
-                    with open(f"{destination}.error", "w") as f:
-                        f.write(str(res))
-            else:
-                logger.info(f"Object {obj} exists, skipping")
-
-
-class RequestsDownloader(Downloader):
+class RequestsDownloader(DownloaderInterface):
 
     def __init__(self):
         self.headers = {
@@ -141,6 +38,7 @@ class RequestsDownloader(Downloader):
         def timeout_handler(signum, frame):
             raise TimeoutError
 
+        logger.info(f"{url=}")
         req = requests.Request('GET', url, headers=self.headers)
         s = requests.Session()
         r = req.prepare()

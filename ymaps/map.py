@@ -1,3 +1,4 @@
+import os
 import math
 import logging
 
@@ -48,7 +49,8 @@ class Map():
 
     tiles = []
 
-    def __init__(self, borders: Borders, z: int, layer: str, version: str):
+    def __init__(self, name: str, borders: Borders, z: int, layer: str, version: str):
+        self.name = name
         self.z = z
         self.x1, self.y1 = coordinate_to_tiles(borders.coord1, z)
         self.x2, self.y2 = coordinate_to_tiles(borders.coord2, z)
@@ -58,16 +60,23 @@ class Map():
         self.width = self.x2 - self.x1
         self.height = self.y2 - self.y1
 
-        logger.info(f"Map.__init__(): {self.x1=}, {self.y1=}, {self.x2=}, {self.y2=}")
+        logger.info(f"Map.__init__(): {self.name=}, {self.x1=}, {self.y1=}, {self.x2=}, {self.y2=}")
 
         for x in range(self.x1, self.x2):
             for y in range(self.y1, self.y2):
-                self.tiles.append(Tile(x, y, self.z, self.layer, self.version))
+                self.tiles.append(Tile(self, x, y, self.z, self.layer, self.version))
 
     def __len__(self):
         return len(self.tiles)
 
     def download(self):
+        # Create destination path if not exists
+        if not os.path.exists(self.path()):
+            os.makedirs(self.path())
+
         d = self.download_scheduler(self.tiles, self.downloader)
         d.download()
         del d
+
+    def path(self):
+        return os.path.join('.', 'maps', self.name, str(self.z))

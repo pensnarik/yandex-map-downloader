@@ -1,4 +1,6 @@
 {
+    "name": "Moscow",
+    "engine": "Yandex",
     "coord1": {"lat": 55.94, "lon": 37.29},
     "coord2": {"lat": 55.50, "lon": 37.92}
 }
