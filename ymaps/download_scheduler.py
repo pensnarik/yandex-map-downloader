@@ -10,17 +10,19 @@ logger = logging.getLogger('ymaps')
 
 class DownloadSimpleScheduler():
 
-    def __init__(self, objects: list, downloader: DownloaderInterface):
+    def __init__(self, objects: list, downloader: DownloaderInterface, policy: DownloadPolicyInterface):
         self.objects = objects
         self.downloader = downloader
+        self.policy = policy
 
     def download(self):
         for obj in self.objects:
-            if not os.path.exists(obj.destination()):
-                logger.info(f"Downloading {obj}")
-                self.downloader.download(obj.url(), obj.destination())
+            download_policy = self.policy(obj)
+
+            if download_policy.before_download():
+                self.downloader().download(obj.url(), obj.destination())
             else:
-                logger.info(f"Object {obj} exists, skipping")
+                logger.info(f"Skipping {obj} because of the policy")
 
 
 class DownloadSleepScheduler():

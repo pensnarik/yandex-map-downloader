@@ -7,7 +7,7 @@ import logging
 import argparse
 
 from ymaps.download_policy import CommonDownloadPolicy
-from ymaps.download_scheduler import DownloadSleepScheduler
+from ymaps.download_scheduler import DownloadSleepScheduler, DownloadSimpleScheduler
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
 from ymaps.downloaders import RequestsDownloader
@@ -42,14 +42,14 @@ class App():
     def download_one_tile(self, tile_str: str):
         tile = Tile.fromstr(tile_map=None, s=tile_str)
         downloader = RequestsDownloader()
-        scheduler = DownloadSleepScheduler([tile], downloader, CommonDownloadPolicy)
+        scheduler = DownloadSimpleScheduler([tile], downloader, CommonDownloadPolicy)
         scheduler.download()
 
 
     def download(self, filename):
         self.map = self.prepare_map(filename)
 
-        self.map.download_scheduler = DownloadSleepScheduler(
+        self.map.download_scheduler = DownloadSimpleScheduler(
             self.map.tiles,
             RequestsDownloader,
             CommonDownloadPolicy
