@@ -17,10 +17,13 @@ class DownloadSimpleScheduler():
 
     def download(self):
         for obj in self.objects:
+            logger.info(f"Downloading {obj}")
             download_policy = self.policy(obj)
 
+
             if download_policy.before_download():
-                self.downloader().download(obj.url(), obj.destination())
+                result = self.downloader().download(obj.url(), obj.destination())
+                logger.info(f"Download result = {result}")
             else:
                 logger.info(f"Skipping {obj} because of the policy")
 

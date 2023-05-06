@@ -10,7 +10,7 @@ from ymaps.download_policy import CommonDownloadPolicy
 from ymaps.download_scheduler import DownloadSleepScheduler, DownloadSimpleScheduler
 from ymaps.tile import Tile
 from ymaps.map import Map, Coordinate, Borders
-from ymaps.downloaders import RequestsDownloader
+from ymaps.downloaders import RequestsDownloader, CurlDownloader
 from ymaps.render import PreviewRenderer
 
 VERSION = '3.1064.0'
@@ -51,7 +51,7 @@ class App():
 
         self.map.download_scheduler = DownloadSimpleScheduler(
             self.map.tiles,
-            RequestsDownloader,
+            CurlDownloader,
             CommonDownloadPolicy
         )
 

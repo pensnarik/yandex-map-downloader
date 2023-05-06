@@ -5,6 +5,7 @@ import shutil
 import logging
 import requests
 import signal
+import subprocess
 
 from urllib3.exceptions import ProtocolError
 from ymaps import (DownloadableInterface, DownloaderInterface, DownloadResultEnum,
@@ -13,6 +14,22 @@ from ymaps.timeout import TimeoutError
 from ymaps.download_policy import CommonDownloadPolicy
 
 logger = logging.getLogger('ymaps')
+
+
+class CurlDownloader(DownloaderInterface):
+
+    def __init__(self):
+        pass
+
+    def download(self, url, destination):
+        result = subprocess.run(
+            ['curl', '-s', '--output', destination, url], stdout=subprocess.PIPE
+        )
+
+        if result.returncode > 0:
+            return DownloadResult(DownloadResultEnum.ERROR, 'curl_error')
+
+        return DownloadResult(DownloadResultEnum.DOWNLOADED)
 
 
 class RequestsDownloader(DownloaderInterface):
