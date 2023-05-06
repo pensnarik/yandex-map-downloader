@@ -1,3 +1,4 @@
+import time
 import random
 import logging
 
@@ -53,7 +54,18 @@ class DownloadSleepScheduler():
 
             if download_policy.before_download():
                 result = self.downloader().download(obj.url(), destination)
-                logger.info(f"Download result: {result}")
                 download_policy.after_download(result)
+
+                logger.info(f"Download result: {result}")
+
+                if result.need_to_sleep():
+                    tiles_in_chunk += 1
+
+                    if tiles_in_chunk >= chunk_size:
+                        logger.info(f"Sleeping for {time_to_sleep} s")
+                        time.sleep(time_to_sleep)
+                        chunk_size, time_to_sleep = self.get_next_chunk()
+                        tiles_in_chunk = 0
+
             else:
                 logger.info(f"Skipping {obj} because of the policy")
