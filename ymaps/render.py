@@ -1,6 +1,9 @@
+import logging
 from PIL import Image, ImageDraw
 
 from ymaps.map import Map
+
+logger = logging.getLogger('ymaps')
 
 class PreviewRenderer():
 
@@ -8,6 +11,7 @@ class PreviewRenderer():
         self.map = map
 
     def render(self, destination: str):
+        logger.info(f"Rendering preview {self.map.width} x {self.map.height}")
         self.image = Image.new("RGB", (self.map.width, self.map.height,), "white")
         draw = ImageDraw.Draw(self.image)
 

@@ -51,7 +51,7 @@ class App():
 
         self.map.download_scheduler = DownloadSimpleScheduler(
             self.map.tiles,
-            CurlDownloader,
+            RequestsDownloader,
             CommonDownloadPolicy
         )
 
@@ -79,7 +79,7 @@ class App():
             self.map = self.prepare_map(filename)
 
         renderer = PreviewRenderer(self.map)
-        renderer.render('overview.png')
+        renderer.render(f'overview-{self.map.name}-{self.map.z}.png')
 
 
     def run(self):

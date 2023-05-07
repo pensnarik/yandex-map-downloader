@@ -47,17 +47,20 @@ def coordinate_to_tiles(coordinate, zoom):
 
 class Map():
 
-    tiles = []
-
     def __init__(self, name: str, borders: Borders, z: int, layer: str, version: str):
         self.name = name
         self.z = z
         self.x1, self.y1 = coordinate_to_tiles(borders.coord1, z)
         self.x2, self.y2 = coordinate_to_tiles(borders.coord2, z)
+
+        if self.x1 >= self.x2 or self.y1 >= self.y2:
+            raise ValueError(f"Invalid coords")
+
         self.version = version
         self.layer = layer
         self.width = self.x2 - self.x1
         self.height = self.y2 - self.y1
+        self.tiles = []
 
         logger.info(f"Map.__init__(): {self.name=}, {self.x1=}, {self.y1=}, {self.x2=}, {self.y2=}")
 
